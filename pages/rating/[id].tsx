@@ -7,16 +7,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/components/AuthProvider';
 import { toast } from 'sonner';
 import { motion } from 'framer-motion';
-import { Rating } from '@/types';
-import { saveAssessment, updateUserEvaluationStatus } from '@/utils/google-sheets';
+import { Rating } from '@/types/supabase';
+import { saveAssessment } from '@/utils/supabase';
 import StarRating from '@/components/StarRating';
+import { supabase } from '@/lib/supabase';
 
 export default function RatingPage() {
   const { user, isAuthenticated } = useAuth();
   const router = useRouter();
   const params = useParams();
   const [targetUser, setTargetUser] = useState<{ id: string; name: string } | null>(null);
-  const [ratings, setRatings] = useState<Partial<Rating>>({
+  const [ratings, setRatings] = useState<Rating>({
     pelayanan: 0,
     akuntabel: 0,
     kompeten: 0,
@@ -39,25 +40,28 @@ export default function RatingPage() {
       return;
     }
 
-    // Find target user (in real app, this would come from API)
-    const mockUsers = [
-      { id: '002', name: 'Budi Santoso' },
-      { id: '003', name: 'Siti Aminah' },
-      { id: '004', name: 'Ahmad Fauzi' },
-      { id: '005', name: 'Rina Kusuma' },
-    ];
+    // Fetch target user from Supabase
+    const fetchTargetUser = async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, name')
+        .eq('id', params.id as string)
+        .single();
 
-    const foundUser = mockUsers.find(u => u.id === params.id as string);
-    if (foundUser) {
-      setTargetUser(foundUser);
-    } else {
-      router.push('/dashboard');
-    }
+      if (error) {
+        console.error('Error fetching target user:', error);
+        router.push('/dashboard');
+      } else if (data) {
+        setTargetUser(data);
+      }
+    };
+
+    fetchTargetUser();
   }, [isAuthenticated, params.id, router]);
 
   const handleStarClick = (aspect: keyof Rating, value: number) => {
     setRatings(prev => ({ ...prev, [aspect]: value }));
-    
+
     // Update description based on selected value
     const desc = getRatingDescription(aspect, value);
     setDescriptions(prev => ({ ...prev, [aspect]: desc }));
@@ -123,7 +127,7 @@ export default function RatingPage() {
     e.preventDefault();
 
     // Validate all ratings are completed
-    if (Object.values(ratings).some(rating => !rating || rating <= 0)) {
+    if (Object.values(ratings).some(rating => rating <= 0)) {
       toast.error('Mohon lengkapi semua aspek penilaian');
       return;
     }
@@ -131,17 +135,15 @@ export default function RatingPage() {
     setIsSubmitting(true);
 
     try {
-      // Save assessment to Google Sheets
+      // Save assessment to Supabase
       if (user && targetUser) {
         const success = await saveAssessment({
-          targetId: targetUser.id,
-          evaluatorId: user.id,
-          ratings: ratings as Rating
+          evaluator_id: user.id,
+          target_id: targetUser.id,
+          ratings: ratings
         });
 
         if (success) {
-          // Update user evaluation status
-          await updateUserEvaluationStatus(targetUser.id, true);
           toast.success('Penilaian berhasil dikirim!');
 
           // Redirect back to dashboard after a delay
@@ -164,7 +166,7 @@ export default function RatingPage() {
     return (
       <div className="mb-2">
         <StarRating
-          value={ratings[aspect] || 0}
+          value={ratings[aspect]}
           onChange={(value) => handleStarClick(aspect, value)}
           size={32}
         />
@@ -267,8 +269,8 @@ export default function RatingPage() {
                 </div>
 
                 <div className="flex justify-center pt-4">
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg"
                     disabled={isSubmitting}
                   >

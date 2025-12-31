@@ -1,35 +1,6 @@
-export type User = {
-  id: string;
-  username: string;
-  name: string;
-  role: 'Admin' | 'User';
-  position: string;
-  evaluated: boolean;
-  password: string;
-};
-
-export type Rating = {
-  pelayanan: number;
-  akuntabel: number;
-  kompeten: number;
-  harmonis: number;
-  loyal: number;
-  adaptif: number;
-  kolaboratif: number;
-};
-
-export type Assessment = {
-  timestamp: string;
-  targetId: string;
-  evaluatorId: string;
-  pelayanan: number;
-  akuntabel: number;
-  kompeten: number;
-  harmonis: number;
-  loyal: number;
-  adaptif: number;
-  kolaboratif: number;
-};
+// Import tipe dari supabase.ts
+// File ini bisa digunakan untuk tipe-tipe tambahan jika diperlukan
+// Tipe utama sekarang berada di types/supabase.ts
 
 export type Question = {
   aspect: string;

@@ -23,7 +23,7 @@ export default function LoginPage() {
 
     try {
       const success = await login(username, password);
-      
+
       if (success) {
         toast.success('Login berhasil!');
         // Redirect based on user role
@@ -59,10 +59,10 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit}>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="username">NIP/Email</Label>
+                <Label htmlFor="username">NIP/Username</Label>
                 <Input
                   id="username"
-                  placeholder="Masukkan NIP atau Email"
+                  placeholder="Masukkan NIP atau Username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   required
@@ -81,8 +81,8 @@ export default function LoginPage() {
               </div>
             </CardContent>
             <CardFooter>
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-blue-600 hover:bg-blue-700 text-white"
                 disabled={isLoading}
               >

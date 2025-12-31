@@ -7,8 +7,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/components/AuthProvider';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User } from '@/types';
-import { fetchUsers } from '@/utils/google-sheets';
+import { User } from '@/types/supabase';
+import { fetchUsers, fetchUserAssessments, calculateProgress } from '@/utils/supabase';
 import AnimatedProgressBar from '@/components/AnimatedProgressBar';
 
 export default function DashboardPage() {
@@ -17,36 +17,43 @@ export default function DashboardPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState('');
+  const [ratedUserIds, setRatedUserIds] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       router.push('/login');
       return;
     }
 
-    const loadUsers = async () => {
+    const loadData = async () => {
       try {
-        // Fetch users from Google Sheets API
-        const allUsers = await fetchUsers();
-        const filteredUsers = allUsers.filter(u => u.role === 'User');
+        setIsLoading(true);
 
-        setUsers(filteredUsers);
+        // Fetch users and assessments
+        const usersData = await fetchUsers(user.id, user.role);
+        const assessments = await fetchUserAssessments(user.id);
+
+        setUsers(usersData);
+        setRatedUserIds(assessments);
 
         // Calculate progress
-        const totalUsers = filteredUsers.length;
-        const ratedUsers = filteredUsers.filter(u => u.evaluated).length;
-        const progressPercent = totalUsers > 0 ? (ratedUsers / totalUsers) * 100 : 0;
+        const totalUsers = usersData.length;
+        const completed = assessments.length;
+        const progressPercent = totalUsers > 0 ? (completed / totalUsers) * 100 : 0;
 
         setProgress(progressPercent);
-        setProgressText(`${ratedUsers} dari ${totalUsers} rekan kerja dinilai`);
+        setProgressText(`${completed} dari ${totalUsers} rekan kerja dinilai`);
       } catch (error) {
-        console.error('Error loading users:', error);
+        console.error('Error loading dashboard data:', error);
         toast.error('Gagal memuat data pegawai');
+      } finally {
+        setIsLoading(false);
       }
     };
 
-    loadUsers();
-  }, [isAuthenticated, router]);
+    loadData();
+  }, [isAuthenticated, user, router]);
 
   const handleLogout = () => {
     logout();
@@ -59,6 +66,17 @@ export default function DashboardPage() {
 
   if (!isAuthenticated || !user) {
     return null; // Render nothing while redirecting
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Memuat dashboard...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -104,9 +122,9 @@ export default function DashboardPage() {
             <CardContent>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <AnimatePresence>
-                  {users
-                    .filter(u => u.role === 'User' && u.id !== user.id) // Exclude current user
-                    .map((employee) => (
+                  {users.map((employee) => {
+                    const isRated = ratedUserIds.includes(employee.id);
+                    return (
                       <motion.div
                         key={employee.id}
                         initial={{ opacity: 0, y: 20 }}
@@ -115,11 +133,11 @@ export default function DashboardPage() {
                         transition={{ duration: 0.3 }}
                         whileHover={{ y: -5 }}
                         className="cursor-pointer"
-                        onClick={() => !employee.evaluated && handleRateUser(employee.id)}
+                        onClick={() => !isRated && handleRateUser(employee.id)}
                       >
                         <Card className={`border-2 ${
-                          employee.evaluated 
-                            ? 'border-green-200 bg-green-50' 
+                          isRated
+                            ? 'border-green-200 bg-green-50'
                             : 'border-slate-200 hover:border-blue-300 hover:shadow-md'
                         } transition-all duration-200`}>
                           <CardContent className="p-4">
@@ -131,18 +149,19 @@ export default function DashboardPage() {
                                 <h3 className="font-semibold text-slate-800 truncate">{employee.name}</h3>
                                 <p className="text-sm text-slate-600 truncate">{employee.position}</p>
                                 <span className={`inline-block px-2 py-1 text-xs rounded-full mt-1 ${
-                                  employee.evaluated 
-                                    ? 'bg-green-100 text-green-800' 
+                                  isRated
+                                    ? 'bg-green-100 text-green-800'
                                     : 'bg-slate-100 text-slate-800'
                                 }`}>
-                                  {employee.evaluated ? 'Sudah Dinilai' : 'Belum Dinilai'}
+                                  {isRated ? 'Sudah Dinilai' : 'Belum Dinilai'}
                                 </span>
                               </div>
                             </div>
                           </CardContent>
                         </Card>
                       </motion.div>
-                    ))}
+                    );
+                  })}
                 </AnimatePresence>
               </div>
             </CardContent>

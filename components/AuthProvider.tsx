@@ -1,8 +1,8 @@
 'use client';
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
-import { User } from '@/types';
-import { authenticateUser } from '@/utils/google-sheets';
+import { User } from '@/types/supabase';
+import { supabase } from '@/lib/supabase';
 
 type AuthContextType = {
   user: User | null;
@@ -18,33 +18,83 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Check if user is already logged in on initial load
   useEffect(() => {
-    const storedUser = localStorage.getItem('user');
-    if (storedUser) {
-      try {
-        setUser(JSON.parse(storedUser));
-      } catch (e) {
-        console.error('Failed to parse user from localStorage', e);
+    // Check active session on initial load
+    const checkSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        // Get user details from our users table
+        const { data, error } = await supabase
+          .from('users')
+          .select('id, username, name, role, position')
+          .eq('id', session.user.id)
+          .single();
+
+        if (data) {
+          setUser(data);
+        }
       }
-    }
-    setIsLoading(false);
+      setIsLoading(false);
+    };
+
+    checkSession();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === 'SIGNED_OUT') {
+          setUser(null);
+        } else if (session) {
+          // Get user details from our users table
+          const { data, error } = await supabase
+            .from('users')
+            .select('id, username, name, role, position')
+            .eq('id', session.user.id)
+            .single();
+
+          if (data) {
+            setUser(data);
+          }
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = async (username: string, password: string): Promise<boolean> => {
     setIsLoading(true);
 
     try {
-      // Call Google Sheets API for authentication
-      const authenticatedUser = await authenticateUser(username, password);
+      // First, try to sign in with Supabase Auth using email format
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email: `${username}@penilaian360.com`, // Using email format for Supabase
+        password: password,
+      });
 
-      if (authenticatedUser) {
-        setUser(authenticatedUser);
-        localStorage.setItem('user', JSON.stringify(authenticatedUser));
-        return true;
+      if (error) {
+        console.error('Login error:', error);
+        return false;
       }
 
-      return false;
+      // If successful, get user details from our users table
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('id, username, name, role, position')
+        .eq('username', username) // Match by username
+        .single();
+
+      if (userError || !userData) {
+        console.error('Error fetching user data:', userError);
+        // Sign out user if user data not found
+        await supabase.auth.signOut();
+        return false;
+      }
+
+      setUser(userData);
+      return true;
     } catch (error) {
       console.error('Login error:', error);
       return false;
@@ -53,9 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
-    localStorage.removeItem('user');
   };
 
   const value = {
