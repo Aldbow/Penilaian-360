@@ -30,8 +30,14 @@ export default function RatingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !user) {
       router.push('/login');
+      return;
+    }
+
+    // Prevent admin from accessing rating pages
+    if (user.role === 'Admin') {
+      router.push('/admin');
       return;
     }
 
@@ -57,7 +63,7 @@ export default function RatingPage() {
     };
 
     fetchTargetUser();
-  }, [isAuthenticated, params.id, router]);
+  }, [isAuthenticated, user, params.id, router]);
 
   const handleStarClick = (aspect: keyof Rating, value: number) => {
     setRatings(prev => ({ ...prev, [aspect]: value }));
