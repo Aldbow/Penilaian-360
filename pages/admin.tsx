@@ -8,8 +8,7 @@ import { useAuth } from '@/components/AuthProvider';
 import { toast } from 'sonner';
 import { motion, AnimatePresence } from 'framer-motion';
 import { User, Assessment } from '@/types/supabase';
-import { fetchUsers as fetchSupabaseUsers, fetchAssessmentResults } from '@/utils/supabase';
-import AnimatedProgressBar from '@/components/AnimatedProgressBar';
+import { fetchUsers, fetchAssessmentResults } from '@/utils/supabase';
 
 export default function AdminPage() {
   const { user, logout, isAuthenticated } = useAuth();

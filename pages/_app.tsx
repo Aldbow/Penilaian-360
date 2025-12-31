@@ -1,20 +1,13 @@
 import { ReactNode } from 'react';
 import { Toaster } from 'sonner';
 import { AuthProvider } from '@/components/AuthProvider';
+import '@/styles/globals.css';
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function App({ Component, pageProps }: { Component: any; pageProps: any }) {
   return (
-    <html lang="id">
-      <body className="min-h-screen bg-slate-50">
-        <AuthProvider>
-          {children}
-          <Toaster position="top-right" />
-        </AuthProvider>
-      </body>
-    </html>
+    <AuthProvider>
+      <Component {...pageProps} />
+      <Toaster position="top-right" />
+    </AuthProvider>
   );
 }
